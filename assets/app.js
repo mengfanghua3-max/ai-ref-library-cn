@@ -784,7 +784,7 @@ function renderCombo() {
   $("#poseRange").onchange = function (e) { COMBO.poseSeries = +e.target.value; comboReroll("pose"); };
   $("#costRange").onchange = function (e) { COMBO.costumeCat = +e.target.value; comboReroll("costume"); };
   $("#rerollAll").onclick = comboAll;
-  $("#count").textContent = "脸 × 服装 × 姿势";
+  $("#count").textContent = "已随机一组 · 每格可单独换";
 
   var x = comboParts();
   function slot(lib, title, base, desc, ratio) {
@@ -891,5 +891,54 @@ document.addEventListener("click", function (e) {
   }
 });
 
-switchLib("face");
+/* ---------- 悬浮面板（使用说明 / 赞赏）：hover 展开，点击兜底 ---------- */
+(function () {
+  var pairs = [["tipsHover", "tipsTrigger"], ["gratHover", "gratTrigger"]];
+  var wraps = [];
+  pairs.forEach(function (pair) {
+    var wrap = document.getElementById(pair[0]);
+    var btn = document.getElementById(pair[1]);
+    if (!wrap || !btn) return;
+    wraps.push(wrap);
+    btn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      var open = !wrap.classList.contains("open");
+      wraps.forEach(function (w) { w.classList.remove("open"); });
+      wrap.classList.toggle("open", open);
+      btn.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+  });
+  document.addEventListener("click", function (e) {
+    if (!wraps.some(function (w) { return w.contains(e.target); })) {
+      wraps.forEach(function (w) { w.classList.remove("open"); });
+    }
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") wraps.forEach(function (w) { w.classList.remove("open"); });
+  });
+})();
+
+/* ---------- 首次访问的赞赏提示：9s 后自动展开一次，8s 后自动收起 ---------- */
+(function () {
+  try {
+    var grat = document.getElementById("gratHover");
+    var gbtn = document.getElementById("gratTrigger");
+    if (!grat || !gbtn) return;
+    if (window.localStorage.getItem("gratNudge")) return;
+    window.localStorage.setItem("gratNudge", "1");
+    setTimeout(function () {
+      if (grat.matches(":hover") || grat.classList.contains("open")) return;
+      grat.classList.add("open");
+      gbtn.setAttribute("aria-expanded", "true");
+      setTimeout(function () {
+        if (!grat.matches(":hover")) {
+          grat.classList.remove("open");
+          gbtn.setAttribute("aria-expanded", "false");
+        }
+      }, 8000);
+    }, 9000);
+  } catch (e) { }
+})();
+
+switchLib("combo");
 })();
