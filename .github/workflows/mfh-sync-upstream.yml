@@ -1,0 +1,77 @@
+name: Sync upstream
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 */6 * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mfh-sync-upstream
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: github.repository == 'mengfanghua3-max/ai-ref-library-cn'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SYNC_BRANCH: ${{ github.event.repository.default_branch }}
+      UPSTREAM_REPO: sleepy-zone/ai-ref-library-cn
+    steps:
+      - name: Merge upstream without force
+        id: merge
+        shell: bash
+        run: |
+          set -euo pipefail
+          parent=$(gh api "repos/${GITHUB_REPOSITORY}" --jq '.parent.full_name')
+          test "$parent" = "$UPSTREAM_REPO"
+          upstream_branch=$(gh api "repos/${UPSTREAM_REPO}" --jq '.default_branch')
+          upstream_sha=$(gh api "repos/${UPSTREAM_REPO}/commits/${upstream_branch}" --jq '.sha')
+          gh api --method POST \
+            -H 'Accept: application/vnd.github+json' \
+            "repos/${GITHUB_REPOSITORY}/merge-upstream" \
+            -f branch="$SYNC_BRANCH"
+          behind=$(gh api "repos/${GITHUB_REPOSITORY}/compare/${upstream_sha}...${SYNC_BRANCH}" --jq '.behind_by')
+          test "$behind" = 0
+          printf 'upstream_sha=%s\n' "$upstream_sha" >> "$GITHUB_OUTPUT"
+          printf 'Upstream merge succeeded. No force update was used.\n' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Record a maintenance check only after 45 days without a push
+        env:
+          VERIFIED_UPSTREAM_SHA: ${{ steps.merge.outputs.upstream_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          pushed_at=$(gh api "repos/${GITHUB_REPOSITORY}" --jq '.pushed_at')
+          age=$(( $(date +%s) - $(date --date="$pushed_at" +%s) ))
+          if (( age < 0 )); then
+            echo 'Unexpected future pushed_at timestamp; stop for inspection.' >&2
+            exit 1
+          fi
+          if (( age < 45 * 24 * 60 * 60 )); then
+            printf 'Recent repository activity: maintenance commit not needed.\n' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          checked_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          content=$(jq -nc \
+            --arg checked "$checked_at" \
+            --arg upstream "$UPSTREAM_REPO" \
+            --arg sha "$VERIFIED_UPSTREAM_SHA" \
+            '{checked_at_utc:$checked,upstream:$upstream,upstream_sha:$sha}' | base64 -w 0)
+          state_sha=$(gh api "repos/${GITHUB_REPOSITORY}/contents/.github?ref=${SYNC_BRANCH}" \
+            --jq '.[] | select(.name == "mfh-sync-activity.json") | .sha')
+          args=(--method PUT "repos/${GITHUB_REPOSITORY}/contents/.github/mfh-sync-activity.json"
+            -f branch="$SYNC_BRANCH"
+            -f message='chore: record periodic upstream sync maintenance'
+            -f 'committer[name]=github-actions[bot]'
+            -f 'committer[email]=41898282+github-actions[bot]@users.noreply.github.com'
+            -f content="$content")
+          if [[ -n "$state_sha" ]]; then
+            args+=(-f sha="$state_sha")
+          fi
+          gh api "${args[@]}" --jq '.commit.html_url'
+          printf 'Recorded a low-frequency maintenance check after 45 days without a push.\n' >> "$GITHUB_STEP_SUMMARY"
