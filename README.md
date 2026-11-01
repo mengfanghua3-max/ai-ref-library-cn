@@ -2,31 +2,29 @@
 
 <img width="2764" height="1858" alt="Image" src="https://github.com/user-attachments/assets/0184a8eb-48fe-4d26-8237-9dc65813843f" />
 
-把作者 **あぎ / ギア（[@giaaibusi](https://x.com/giaaibusi)）** 公开的三套 AI 作图参考素材，做成了一个中文检索界面：
+基于 **あぎ / ギア（[@giaaibusi](https://x.com/giaaibusi)）** 公开的三套 AI 作图参考素材的中文版网站。
 
-| 库 | 内容 | 数量 | 源站 |
-| --- | --- | --- | --- |
-| 脸库 | 正面向、纯色背景的头部参考（脸部特写 893 / 造型 606） | 1,499 张 | <https://ai-portrait-gallery.pages.dev/> |
-| 姿势库 | 无脸灰色人偶线稿，每姿势 5 个机位 | 288 姿势 / 1,439 图 | <https://ai-pose-gallery.pages.dev/> |
-| 服装库 | 无人物、只有服装的参考图（8 个分类） | 1,407 套 | <https://ai-costume-gallery.pages.dev/> |
+* 分类与标签全部译成中文
+* 中英双语搜索
+* 一键复制作图指令
+* 三库统一入口，姿势库已支持 depth
+* **随机组合生成提示词**。
 
-中文版做的事：分类与标签全部译成中文、中英双语搜索、一键复制作图指令、三库统一入口，外加**随机组合生成提示词**。
-
-**在线版**：<https://sleepyzone.online/ai-ref-library-cn/>
+**在线访问**：<https://sleepyzone.online/ai-ref-library-cn/>
 
 ## 目录
 
 - [随机组合](#随机组合)：一次抽齐脸 / 服装 / 姿势，并生成提示词
   - [两种参考图形式](#两种参考图形式)：链接版 vs 单张三联图
-- [打开方式](#打开方式)：双击 index.html 即可
-- [原图怎么来](#原图怎么来)：本地原图 / 源站 / 网盘备份
-- [埋点](#埋点)：默认关闭，填一个 ID 即可接入
-- [授权](#授权)：三个库的许可差异
+- [本地开发](#本地开发)
+- [原图下载](#原图下载)
+- [埋点](#埋点)
+- [授权](#授权)
 - [免责](#免责)
 
 ## 随机组合
 
-<img width="2644" height="1842" alt="Image" src="https://github.com/user-attachments/assets/73470587-cffd-42ba-be7d-ce1e8db4aa82" />
+<img width="2606" height="1730" alt="Image" src="https://github.com/user-attachments/assets/a25be79a-2150-4615-9e29-cb1634d5b72d" />
 
 点顶部 **🎲 随机组合**：从脸库、服装库、姿势库各随机抽一条，三张参考图并排，并自动生成现成的提示词。
 
@@ -74,47 +72,7 @@
 
 ## 埋点
 
-默认不采集（`providers` 为空时：不加载任何第三方脚本、不发任何请求，事件只写进浏览器的 `window.__trackLog`，保留最近 200 条）。**本站当前已开启：GA4 `G-0C99160522` + Microsoft Clarity `r1wmvdsf4a`。**
-
-要启用，在 `config.js` 里填项目 ID，**可以同时接多家**：
-
-```js
-window.ANALYTICS = {
-  providers: [
-    { provider: "clarity", id: "你的 Clarity 项目 ID" },
-    { provider: "ga4", id: "G-XXXXXXXXXX" }
-  ]
-};
-```
-
-| provider | 填什么 | 说明 |
-| --- | --- | --- |
-| `none` | — | 默认，只本地打日志 |
-| `ga4` | `G-XXXXXXXXXX` | Google Analytics 4，会写 cookie，国内访问偏慢 |
-| `baidu` | `hm.js?` 后面那串 | 百度统计，国内速度最好 |
-| `umami` | website-id | Umami Cloud，无 cookie，需自建或订阅 |
-| `clarity` | 项目 ID | Microsoft Clarity，**会话录制 + 热图 + 点击统计**，免费无限量，国内可访问 |
-| `cloudflare` | beacon token | Cloudflare Web Analytics，只统计 PV，无自定义事件 |
-
-Clarity 的具体接入：在 <https://clarity.microsoft.com> 新建项目、填站点域名，拿到项目 ID（形如 `abcdefghij`）填进上面的 `id` 即可。它会把每个自定义事件记成 `event`，并把 `lib / type / value / label / mode / action / trigger / id` 作为标签上报，在 Clarity 后台的 **Filters** 里可以直接按这些标签筛会话录制。
-
-### 上报的事件
-
-| 事件 | 触发点 | 携带参数 |
-| --- | --- | --- |
-| `lib_view` | 切换脸库 / 姿势库 / 服装库 / 组合 | `lib` |
-| `search` | 搜索框输入（防抖 800ms） | `lib`, `q`（截断 40 字） |
-| `filter` | 分类 / 发长 / 机位 / 视图筛选 | `lib`, `type`, `value` |
-| `item_open` | 打开任意条目大图 | `lib`, `id` |
-| `original_download` | 点「下载原图」 | `lib`, `id` |
-| `copy` | 任意复制按钮 | `label` |
-| `combo_roll` | 随机组合（全部换 / 单项换） | `trigger`, `face`, `costume`, `pose` |
-| `combo_mode` | 切换「链接 / 三联图」模式 | `mode` |
-| `combo_sheet` | 下载或复制三联图 | `action` |
-
-调试：控制台执行 `window.__trackDebug = true` 刷新，每条事件都会打印；`window.__trackLog` 随时可查。
-
-> 隐私提醒：`search` 会上报搜索词。如果不想收集，可以把 app.js 里 `trackEvent("search", ...)` 的 `q` 参数删掉。
+**本站当前已开启：GA4 `G-0C99160522` + Microsoft Clarity `r1wmvdsf4a`。**
 
 ## 授权
 
@@ -127,6 +85,12 @@ Clarity 的具体接入：在 <https://clarity.microsoft.com> 新建项目、填
 - 三个库都**不涉及真实人物**（全部 AI 生成）
 - 服装库作者做过品牌相似度检查，但**不保证不侵权**，商用前请自行判断
 - 本仓库只收录缩略图用于检索，原图请走源站下载；**请勿把原图打包再分发**
+
+| 库 | 内容 | 数量 | 源站 |
+| --- | --- | --- | --- |
+| 脸库 | 正面向、纯色背景的头部参考（脸部特写 893 / 造型 606） | 1,499 张 | <https://ai-portrait-gallery.pages.dev/> |
+| 姿势库 | 无脸灰色人偶线稿，每姿势 5 个机位 | 288 姿势 / 1,439 图 | <https://ai-pose-gallery.pages.dev/> |
+| 服装库 | 无人物、只有服装的参考图（8 个分类） | 1,407 套 | <https://ai-costume-gallery.pages.dev/> |
 
 ## 免责
 
