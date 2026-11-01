@@ -1,6 +1,6 @@
 # AI 作图素材库 · 中文版（脸 / 姿势 / 服装）
 
-<img width="2650" height="1864" alt="Image" src="https://github.com/user-attachments/assets/7d9d60fb-20e0-4cca-9797-91281727dfa2" />
+<img width="2764" height="1858" alt="Image" src="https://github.com/user-attachments/assets/0184a8eb-48fe-4d26-8237-9dc65813843f" />
 
 把作者 **あぎ / ギア（[@giaaibusi](https://x.com/giaaibusi)）** 公开的三套 AI 作图参考素材，做成了一个中文检索界面：
 
@@ -12,7 +12,7 @@
 
 中文版做的事：分类与标签全部译成中文、中英双语搜索、一键复制作图指令、三库统一入口，外加**随机组合生成提示词**。
 
-**在线版**：<https://sleepyzone.online/ai-ref-library-cn/>（GitHub Pages，推 main 自动更新）
+**在线版**：<https://sleepyzone.online/ai-ref-library-cn/>
 
 ## 目录
 
@@ -44,25 +44,15 @@
 
 <img width="1620" height="1854" alt="Image" src="https://github.com/user-attachments/assets/17454dd8-3e23-47cc-8f6c-f3607bf7df6b" />
 
-## 打开方式
-
-**直接双击 index.html** 即可（本地 file:// 就能跑，不需要服务器）。
-
-如果浏览器限制本地脚本，也可以在目录里起个静态服务：
+## 本地开发
 
     python3 -m http.server 8080
 
-然后访问 http://localhost:8080 。
+然后访问 http://localhost:8080
 
-## 原图怎么来
+## 原图下载
 
-仓库里**只有缩略图**（内嵌在 data/*.js 里，所以任何环境都不会裂图）。点「下载原图」时按这个顺序：
-
-1. config.js 里配了本地目录、且文件存在、且使用 file:// 打开 → 直接用本地原图（快、离线可用）
-    * 下载原图后，放置本目录的上层目录，和 config.js 配置一致即可
-2. 否则 → 跳转作者源站的对应文件，国内访问会比较慢，推荐下载原图
-
-附原图下载地址（网盘下载仅为本地预览高清图）：
+注：仅用于本地预览高清图
 
 **AI 作图脸库**
 

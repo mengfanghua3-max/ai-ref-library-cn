@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AI 作图素材库 · 中文版（脸 / 姿势 / 服装）</title>
-<link rel="stylesheet" href="assets/style.css?v=13">
+<link rel="stylesheet" href="assets/style.css?v=21">
 </head>
 <body>
 <header><div class="wrap">
@@ -42,6 +42,11 @@
     <button data-lib="pose">姿势库<b>288</b><i>个姿势 / 1,439 张</i></button>
     <button data-lib="costume">服装库<b>1,407</b><i>套</i></button>
     <button data-lib="combo">🎲 随机组合<i>一次抽齐脸 / 服装 / 姿势</i></button>
+    <div class="refmode" id="refModeSeg" role="group" aria-label="参考图形式">
+      <span class="refmode-label">参考图</span>
+      <button data-mode="line" class="on" aria-pressed="true">线稿</button>
+      <button data-mode="depth" aria-pressed="false">depth</button>
+    </div>
   </nav>
 </div></header>
 
@@ -64,6 +69,10 @@
 <div class="modal" id="modal">
   <div class="mbox">
     <div class="mimg">
+      <div class="mview" id="mMode" hidden>
+        <button data-mode="line">线稿</button>
+        <button data-mode="depth">depth</button>
+      </div>
       <img id="mimg" alt="">
       <button class="nav-arrow l" id="mprev" aria-label="上一张">‹</button>
       <button class="nav-arrow r" id="mnext" aria-label="下一张">›</button>
@@ -74,6 +83,7 @@
       <div id="mextra"></div>
       <div class="acts">
         <a id="mdl" href="#" target="_blank" rel="noopener" download>下载原图</a>
+        <a id="mdepth" class="ghost" href="#" target="_blank" rel="noopener" hidden>下载 depth（跳源站另存）↗</a>
         <button id="mcopy">复制作图指令</button>
       </div>
       <div class="keys"><kbd>←</kbd><kbd>→</kbd> 上一张 / 下一张（姿势库里为切换机位）· <kbd>Esc</kbd> 关闭<br>点大图可在新标签打开原图。</div>
@@ -82,7 +92,7 @@
 </div>
 
 <script src="config.js"></script>
-<script src="assets/analytics.js?v=13"></script>
-<script src="assets/app.js?v=13"></script>
+<script src="assets/analytics.js?v=21"></script>
+<script src="assets/app.js?v=21"></script>
 </body>
 </html>
