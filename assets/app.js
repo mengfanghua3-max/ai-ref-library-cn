@@ -933,7 +933,7 @@ function renderCombo() {
 }
 
 /* ---------- 主切换 ---------- */
-function switchLib(lib) {
+function switchLib(lib, opts) {
   S.lib = lib; S.q = "";
   trackEvent("lib_view", { lib: lib });
   document.querySelectorAll(".nav button").forEach(function (b) {
@@ -944,7 +944,9 @@ function switchLib(lib) {
     $("#grid").className = "grid";
     $("#grid").innerHTML = "";
     loadAll().then(function () {
-      if (!COMBO.face) comboAll(); else renderCombo();
+      if (!COMBO.face) comboAll();
+      else if (opts && opts.reroll) comboAll();   // 点导航「随机组合」= 重新抽一组
+      else renderCombo();
     }).catch(function (err) {
       $("#toolbar").innerHTML = '<div class="empty">' + esc(err.message) + "</div>";
     });
@@ -959,7 +961,9 @@ function switchLib(lib) {
 }
 
 document.querySelectorAll(".nav button").forEach(function (b) {
-  b.onclick = function () { switchLib(b.dataset.lib); };
+  b.onclick = function () {
+    switchLib(b.dataset.lib, { reroll: b.dataset.lib === "combo" });
+  };
 });
 function randomOpen() {
   if (S.lib === "combo") { if (COMBO.face) comboAll(); return; }
@@ -983,7 +987,7 @@ document.addEventListener("click", function (e) {
 
 /* ---------- 悬浮面板（使用说明 / 赞赏）：hover 展开，点击兜底 ---------- */
 (function () {
-  var pairs = [["tipsHover", "tipsTrigger"], ["gratHover", "gratTrigger"]];
+  var pairs = [["tipsHover", "tipsTrigger"], ["gratHover", "gratTrigger"], ["panHover", "panTrigger"]];
   var wraps = [];
   pairs.forEach(function (pair) {
     var wrap = document.getElementById(pair[0]);
@@ -1031,10 +1035,41 @@ document.addEventListener("click", function (e) {
 })();
 
 /* ---------- 全局参考图形式（线稿 / depth） ---------- */
+function renderPanTop() {
+  var cfg = window.PAN_LINKS || {};
+  var defs = [
+    { key: "face", name: "脸库", count: "1,499 张" },
+    { key: "pose", name: "姿势库", count: "1,439 张" },
+    { key: "costume", name: "服装库", count: "1,407 套" }
+  ];
+  var html = defs.map(function (d) {
+    var item = cfg[d.key] || {};
+    var links = "";
+    if (item.baidu) links += '<a href="' + item.baidu + '" target="_blank" rel="sponsored noopener" data-pan="' + d.key + '_baidu">百度网盘</a>';
+    if (item.quark) links += '<a href="' + item.quark + '" target="_blank" rel="sponsored noopener" data-pan="' + d.key + '_quark">夸克</a>';
+    if (!links) return "";
+    return '<div class="pantop-row"><span class="pantop-name">' + d.name + '<em>' + d.count + '</em></span><span class="pantop-links">' + links + "</span></div>";
+  }).join("");
+  var box = document.getElementById("panRows");
+  if (!box) return;
+  box.innerHTML = html || '<p class="pantop-note">暂无网盘链接</p>';
+  box.querySelectorAll("[data-pan]").forEach(function (a) {
+    a.onclick = function () { trackEvent("ref_click", { source: "pan_top_" + a.dataset.pan }); };
+  });
+}
+
+renderPanTop();
+
 document.querySelectorAll("#refModeSeg button").forEach(function (b) {
   b.onclick = function () { setRefMode(b.dataset.mode); };
 });
 syncModeUI();
+
+/* ---------- 姊妹站点击埋点 ---------- */
+(function () {
+  var link = document.getElementById("sisterLink");
+  if (link) link.addEventListener("click", function () { trackEvent("ref_click", { source: "sister_top" }); });
+})();
 
 switchLib("combo");
 })();
