@@ -12,25 +12,43 @@ function trackSearch() {
   }, 800);
 }
 
+/* 输入去抖：每次按键重建 1400+ 张卡会把 INP 顶到 300ms 以上 */
+var qTimer = null;
+function bindSearch() {
+  $("#q").oninput = function (e) {
+    var v = e.target.value.trim();
+    clearTimeout(qTimer);
+    qTimer = setTimeout(function () {
+      S.q = v;
+      SHOWN = PER_PAGE;
+      render(true);
+      trackSearch();
+    }, 180);
+  };
+}
+
 var LIB = {
   face: {
-    key: "face", name: "脸库", file: "data/face.js", g: "LIB_FACE", total: 1499, unit: "张",
+    key: "face", name: "脸库", file: "data/face.js", g: "LIB_FACE", total: 1499, unit: "张", size: "0.2",
     site: "https://ai-portrait-gallery.pages.dev/",
     remote: function (base) { return "https://ai-portrait-gallery.pages.dev/img/full/" + base + ".png"; }
   },
   pose: {
-    key: "pose", name: "姿势库", file: "data/pose.js", g: "LIB_POSE", total: 288, unit: "个姿势",
+    key: "pose", name: "姿势库", file: "data/pose.js", g: "LIB_POSE", total: 288, unit: "个姿势", size: "0.17",
     site: "https://ai-pose-gallery.pages.dev/",
     remote: function (base) { return "https://ai-pose-gallery.pages.dev/img/" + base + ".png"; }
   },
   costume: {
-    key: "costume", name: "服装库", file: "data/costume.js", g: "LIB_COSTUME", total: 1407, unit: "套",
+    key: "costume", name: "服装库", file: "data/costume.js", g: "LIB_COSTUME", total: 1407, unit: "套", size: "0.3",
     site: "https://ai-costume-gallery.pages.dev/",
     remote: function (base) { return "https://ai-costume-gallery.pages.dev/png/" + base + ".png"; }
   }
 };
 
 var LOCAL = window.LOCAL_ORIGINALS || { face: "", pose: "", costume: "" };
+
+var PER_PAGE = 200;   // 一次渲染的卡片上限，超出用「显示更多」追加
+var SHOWN = PER_PAGE;
 
 var S = {
   lib: "face", q: "",
@@ -51,6 +69,27 @@ function data(lib) { return cache[lib].data; }
 function imgMap(lib) { return cache[lib].img; }
 function thumb(lib, base) { return imgMap(lib)[base] || ""; }
 
+/* 首屏前 n 张图改成 eager，第一张抬到 high 优先级：
+   全部 loading="lazy" 连视口内的图也降级，LCP 会被拖到 2.5s 以上 */
+function eagerFirst(container, n) {
+  if (!container) return;
+  var imgs = container.querySelectorAll("img");
+  for (var i = 0; i < Math.min(n, imgs.length); i++) {
+    imgs[i].loading = "eager";
+    imgs[i].decoding = "async";
+  }
+  if (imgs[0]) imgs[0].setAttribute("fetchpriority", "high");
+}
+
+/* 轻提示：点提示词框复制后给个反馈，否则用户不知道点成功了 */
+function flash(msg) {
+  var d = document.createElement("div");
+  d.className = "toast";
+  d.textContent = msg;
+  document.body.appendChild(d);
+  setTimeout(function () { d.remove(); }, 1500);
+}
+
 function loadLib(lib) {
   if (cache[lib]) return Promise.resolve(cache[lib]);
   return new Promise(function (resolve, reject) {
@@ -64,7 +103,7 @@ function loadLib(lib) {
     };
     s.onerror = function () { reject(new Error("无法加载 " + LIB[lib].file)); };
     document.head.appendChild(s);
-    $("#toolbar").innerHTML = '<div class="loading">正在载入' + LIB[lib].name + "（约 15 MB，首次打开需要几秒）…</div>";
+    $("#toolbar").innerHTML = '<div class="loading">正在载入' + LIB[lib].name + "（约 " + (LIB[lib].size || "0.2") + " MB）…</div>";
     $("#grid").innerHTML = "";
   });
 }
@@ -165,7 +204,7 @@ function toolbarFace() {
     b.onclick = function () { S.face.hair = +b.dataset.hair; trackEvent("filter", { lib: "face", type: "hair", value: b.dataset.hair }); render(); };
   });
   $("#q").value = S.q;
-  $("#q").oninput = function (e) { S.q = e.target.value.trim(); render(true); trackSearch(); };
+  bindSearch();
 }
 
 function toolbarPose() {
@@ -199,7 +238,7 @@ function toolbarPose() {
   });
   $("#cat").onchange = function (e) { S.pose.cat = e.target.value; trackEvent("filter", { lib: "pose", type: "cat", value: e.target.value || "all" }); render(); };
   $("#q").value = S.q;
-  $("#q").oninput = function (e) { S.q = e.target.value.trim(); render(true); trackSearch(); };
+  bindSearch();
 }
 
 function toolbarCostume() {
@@ -214,7 +253,7 @@ function toolbarCostume() {
     b.onclick = function () { S.costume.cat = +b.dataset.cat; trackEvent("filter", { lib: "costume", type: "cat", value: b.dataset.cat }); render(); };
   });
   $("#q").value = S.q;
-  $("#q").oninput = function (e) { S.q = e.target.value.trim(); render(true); trackSearch(); };
+  bindSearch();
 }
 
 /* ---------- 渲染 ---------- */
@@ -230,27 +269,40 @@ function render(gridOnly) {
   else renderCostume();
 }
 
+/* 同时覆盖普通网格卡片和「随机组合」的三个 slot（默认落地页就是 combo，
+   以前只匹配 #grid .card img，导致 combo 首屏三张图一直是 lazy）*/
 function optimizeFirstScreen() {
-  var imgs = document.querySelectorAll("#grid .card img");
-  for (var i = 0; i < imgs.length && i < 10; i++) {
-    imgs[i].loading = "eager";
-    imgs[i].setAttribute("fetchpriority", "high");
-  }
+  eagerFirst(document.getElementById("grid"), 8);
+}
+
+/* 大列表分页渲染：一次最多画 PER_PAGE 张，剩下的用「显示更多」追加，避免每次筛选都重建上千个节点 */
+function appendMore(total, painted, redraw, unit) {
+  document.body.classList.toggle("big-grid", painted > 120);
+  if (painted >= total) return;
+  var b = document.createElement("button");
+  b.className = "more-btn";
+  b.textContent = "显示更多（还有 " + (total - painted) + " " + (unit || "项") + "）";
+  b.onclick = function () { SHOWN += PER_PAGE; redraw(); };
+  var g = document.getElementById("grid");
+  if (g) g.appendChild(b);
 }
 
 function renderFace() {
   var d = data("face");
   var list = d.items.filter(faceMatch);
+  var shown = Math.min(SHOWN, list.length);
   $("#grid").className = "grid face";
-  $("#grid").innerHTML = list.map(faceCard).join("");
-  $("#count").textContent = "符合条件：" + list.length + " 张";
+  $("#grid").innerHTML = list.slice(0, shown).map(faceCard).join("");
+  $("#count").textContent = "符合条件：" + list.length + " 张" + (shown < list.length ? "（已显示 " + shown + "）" : "");
   $("#grid").querySelectorAll(".card").forEach(function (c) { c.onclick = function () { openFace(c.dataset.id); }; });
   optimizeFirstScreen();
+  appendMore(list.length, shown, renderFace, "张");
 }
 
 function renderPose() {
   var d = data("pose");
-  var list = d.poses.filter(poseMatch);
+  var all = d.poses.filter(poseMatch);
+  var list = all.slice(0, SHOWN);
   var html = "", shown = 0;
   if (S.pose.view === "one") {
     var angs = S.pose.ang ? [S.pose.ang] : ["正面", "俯视", "仰视", "侧面", "斜45°"];
@@ -263,7 +315,7 @@ function renderPose() {
   }
   $("#grid").className = "grid pose";
   $("#grid").innerHTML = html;
-  $("#count").textContent = "符合条件：" + shown + (S.pose.view === "one" ? " 张" : " 个姿势");
+  $("#count").textContent = "符合条件：" + all.length + (S.pose.view === "one" ? " 个姿势 / " + shown + " 张" : " 个姿势") + (list.length < all.length ? "（已显示 " + list.length + " 个）" : "");
   $("#grid").querySelectorAll(".card").forEach(function (c) {
     var ph = c.querySelector(".ph");
     c.onclick = function () { openPose(c.dataset.k || c.dataset.key, ph.dataset.a || S.pose.ang || "正面"); };
@@ -272,6 +324,7 @@ function renderPose() {
     });
   });
   optimizeFirstScreen();
+  appendMore(all.length, list.length, renderPose, "个");
 }
 
 function poseCardOne(p, a) {
@@ -284,11 +337,13 @@ function poseCardOne(p, a) {
 function renderCostume() {
   var d = data("costume");
   var list = d.items.filter(costumeMatch);
+  var shown = Math.min(SHOWN, list.length);
   $("#grid").className = "grid";
-  $("#grid").innerHTML = list.map(costumeCard).join("");
-  $("#count").textContent = "符合条件：" + list.length + " 套";
+  $("#grid").innerHTML = list.slice(0, shown).map(costumeCard).join("");
+  $("#count").textContent = "符合条件：" + list.length + " 套" + (shown < list.length ? "（已显示 " + shown + "）" : "");
   $("#grid").querySelectorAll(".card").forEach(function (c) { c.onclick = function () { openCostume(c.dataset.id); }; });
   optimizeFirstScreen();
+  appendMore(list.length, shown, renderCostume, "套");
 }
 
 /* ---------- 弹窗 ---------- */
@@ -554,15 +609,16 @@ function comboReroll(which) {
   if (which === "face") COMBO.face = pick(data("face").items);
   else if (which === "costume") COMBO.costume = pick(poolCostume());
   else COMBO.pose = pick(poolPose());
-  trackEvent("combo_roll", { trigger: which, face: COMBO.face.id, costume: COMBO.costume.id, pose: COMBO.pose.id });
+  trackEvent("combo_reroll", { target: which, face: COMBO.face.id, costume: COMBO.costume.id, pose: COMBO.pose.id });
   renderCombo();
 }
-function comboAll() {
+/* reason: "init" = 进页面自动抽一组（基线），"user" = 用户点「全部换一组」 */
+function comboAll(reason) {
   COMBO.face = pick(data("face").items);
   COMBO.costume = pick(poolCostume());
   COMBO.pose = pick(poolPose());
-  trackEvent("combo_roll", {
-    trigger: "all",
+  trackEvent(reason === "init" ? "combo_init" : "combo_reroll", {
+    target: "all",
     face: COMBO.face.id,
     costume: COMBO.costume.id,
     pose: COMBO.pose.id,
@@ -873,7 +929,7 @@ function renderCombo() {
     + '<span id="count"></span></div>';
   $("#poseRange").onchange = function (e) { COMBO.poseSeries = +e.target.value; comboReroll("pose"); };
   $("#costRange").onchange = function (e) { COMBO.costumeCat = +e.target.value; comboReroll("costume"); };
-  $("#rerollAll").onclick = comboAll;
+  $("#rerollAll").onclick = function () { comboAll("user"); };
   $("#count").textContent = "已随机一组 · 每格可单独换";
 
   var x = comboParts();
@@ -911,6 +967,24 @@ function renderCombo() {
   $("#grid").className = "combo";
   $("#grid").innerHTML = html;
   $("#promptText").value = promptZh();
+  optimizeFirstScreen();
+
+  /* 点提示词框 = 全选并复制：很多人第一反应是点它，之前点了没反应（无效点击） */
+  var pt = $("#promptText");
+  if (pt) {
+    pt.onclick = function () {
+      this.select();
+      var text = this.value;
+      trackEvent("copy", { label: "prompt_box_click", lib: "combo" });
+      var ok = function () { flash("已复制提示词"); };
+      var fail = function () { flash("已全选，按 Ctrl/⌘+C 复制"); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(ok).catch(function () { fallbackCopy(text, ok, fail); });
+      } else {
+        fallbackCopy(text, ok, fail);
+      }
+    };
+  }
 
   $("#grid").querySelectorAll("[data-reroll]").forEach(function (b) {
     b.onclick = function () { comboReroll(b.dataset.reroll); };
@@ -935,17 +1009,18 @@ function renderCombo() {
 /* ---------- 主切换 ---------- */
 function switchLib(lib, opts) {
   S.lib = lib; S.q = "";
+  SHOWN = PER_PAGE;
   trackEvent("lib_view", { lib: lib });
   document.querySelectorAll(".nav button").forEach(function (b) {
     b.classList.toggle("on", b.dataset.lib === lib);
   });
   if (lib === "combo") {
-    $("#toolbar").innerHTML = '<div class="loading">正在载入三套素材（约 18 MB，首次需要几秒）…</div>';
+    $("#toolbar").innerHTML = '<div class="loading">正在载入三套素材（约 0.7 MB，首次约 1–3 秒）…</div>';
     $("#grid").className = "grid";
     $("#grid").innerHTML = "";
     loadAll().then(function () {
-      if (!COMBO.face) comboAll();
-      else if (opts && opts.reroll) comboAll();   // 点导航「随机组合」= 重新抽一组
+      if (!COMBO.face) comboAll("init");
+      else if (opts && opts.reroll) comboAll("user");   // 点导航「随机组合」= 重新抽一组
       else renderCombo();
     }).catch(function (err) {
       $("#toolbar").innerHTML = '<div class="empty">' + esc(err.message) + "</div>";
@@ -966,7 +1041,7 @@ document.querySelectorAll(".nav button").forEach(function (b) {
   };
 });
 function randomOpen() {
-  if (S.lib === "combo") { if (COMBO.face) comboAll(); return; }
+  if (S.lib === "combo") { if (COMBO.face) comboAll("user"); return; }
   if (!cache[S.lib]) return;
   var list;
   if (S.lib === "face") list = data("face").items.filter(faceMatch);
